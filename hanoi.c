@@ -1,10 +1,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <Windows.h>
 
 char password[] = "abcdef123456";
+char key[] = "cloud";
+uint32_t crc = 1922916129;
+
+void decrypt() {
+    int key_length = strlen(key);
+    int cnt = 0;
+    for (int i = 0; i < strlen(password); i++) {
+        password[i] = (password[i]);
+        cnt++;
+        if (cnt == key_length)
+            cnt = 0;
+    }
+    printf("%s\n", password);
+}
+
+uint32_t crc32(const void *data, size_t length) {
+    uint32_t crc = 0xFFFFFFFF;
+    const uint8_t *p = data;
+    for (size_t i = 0; i < length; i++) {
+        crc ^= p[i];
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1) {
+                crc = (crc >> 1) ^ 0xEDB88320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    return crc ^ 0xFFFFFFFF;
+}
 
 bool compare_passwords() {
 
@@ -62,9 +94,18 @@ void hanoi(int n, char a, char b, char c) {
 int main() {
 
     srand(time(NULL));
+    decrypt();
+    uint32_t expected_crc = crc32((const void *)compare_passwords, (size_t)((char *)main - (char *)compare_passwords));
+    printf("%d\n", expected_crc);
+
+    if (expected_crc != crc) {
+        printf("CRC is incorrect!\n");
+        return 0;
+    }
 
     if (compare_passwords()) {
 
+        compare_passwords();
         printf("Password is correct!\n");
         create_key();  
         while (1) {
@@ -74,6 +115,7 @@ int main() {
             if (n <= 0) {
                 return 0;
             } else {
+                compare_passwords();
                 hanoi(n, 'a', 'b', 'c');
             }
         }
