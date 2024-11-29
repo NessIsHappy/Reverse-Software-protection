@@ -17,7 +17,7 @@ char error_msg_5[] = "9H9U_iU_dYehh[Yj";
 char msg_1[] = ";dj[hUdkcX[hUe\\UZ_iYi0";
 
 int key = 10;
-uint32_t crc = -194981038;
+uint32_t crc = -603953984;
 
 void decrypt(char *string) {
 
@@ -45,18 +45,6 @@ uint32_t crc32(const void *data, size_t length) {
 
 }
 
-void detect_virtual_machine() {
-
-    HKEY hTheKey;
-    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Enum\\PCI\\VEN_5333&DEV_8811&SUBSYS_00000000&REV_00", 0, KEY_QUERY_VALUE, &hTheKey) == ERROR_SUCCESS) {
-        RegCloseKey(hTheKey);
-        decrypt(error_msg_1);
-        printf("%s\n", error_msg_1);
-        ExitProcess(0);
-    }
-
-}
-
 void remote_debugger() {
 
     BOOL isDebugerPresent = FALSE;
@@ -77,14 +65,104 @@ void detect_ollydbg_or_windbg() {
 }
 
 void check_ticks() {
+
 	int x = 0;
-	DWORD Time = GetTickCount64();
+	DWORD timer = GetTickCount64();
 	for (short i = 0; i < 10; i++) {
 		x++;
 	}
-	Time = GetTickCount64()-Time;
-	if (Time > 0x10) 
+	timer = GetTickCount64()-timer;
+	if (timer > 0x10) 
 		ExitProcess(0);
+
+}
+
+void check_registry_key(HKEY hKeyRoot, const char *subKey) {
+
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(hKeyRoot, subKey, 0, KEY_READ, &hKey);
+    
+    if (result == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        decrypt(error_msg_1);
+        printf("%s\n", error_msg_1);
+        ExitProcess(0);
+    }
+
+}
+
+void check_vmware_keys() {
+
+    const char *vmwareKeys[] = {
+        "Software\\VMware, Inc.",
+        "SOFTWARE\\VMware, Inc.",
+        "SYSTEM\\CurrentControlSet\\Enum\\SCSI\\*VMware*",
+        "SYSTEM\\CurrentControlSet\\Services\\*VMware*"
+    };
+
+    for (int i = 0; i < sizeof(vmwareKeys) / sizeof(vmwareKeys[0]); i++) {
+        check_registry_key(HKEY_CURRENT_USER, vmwareKeys[i]);
+        check_registry_key(HKEY_LOCAL_MACHINE, vmwareKeys[i]);
+    }
+    
+}
+
+void check_vbox_keys() {
+
+    const char *virtualBoxKeys[] = {
+        "HARDWARE\\ACPI\\DSDT\\VBOX__",
+        "HARDWARE\\ACPI\\FADT\\VBOX__",
+        "HARDWARE\\ACPI\\RSDT\\VBOX__",
+        "SYSTEM\\CurrentControlSet\\Services\\VBox*",
+        "SOFTWARE\\Oracle\\VirtualBox Guest Additions"
+    };
+
+    for (int i = 0; i < sizeof(virtualBoxKeys) / sizeof(virtualBoxKeys[0]); i++) {
+        check_registry_key(HKEY_LOCAL_MACHINE, virtualBoxKeys[i]);
+    }
+
+}
+
+void check_file(const char *filePath) {
+
+    FILE *file = fopen(filePath, "r");
+    if (file) {
+        decrypt(error_msg_1);
+        printf("%s\n", error_msg_1);
+        fclose(file);
+        ExitProcess(0);
+    }
+
+}
+
+void check_vmware_files() {
+
+    const char *vmwareFiles[] = {
+        "C:\\Windows\\System32\\drivers\vmhgfs.sys",
+        "C:\\Windows\\System32\\drivers\vmmemctl.sys",
+        "C:\\Windows\\System32\\drivers\vmmouse.sys",
+        "C:\\Windows\\System32\\drivers\vmrawdsk.sys"
+    };
+
+    for (int i = 0; i < sizeof(vmwareFiles) / sizeof(vmwareFiles[0]); i++) {
+        check_file(vmwareFiles[i]);
+    }
+
+}
+
+void check_vbox_files() {
+
+    const char *virtualBoxFiles[] = {
+        "C:\\Windows\\System32\\drivers\\VBoxMouse.sys",
+        "C:\\Windows\\System32\\drivers\\VBoxGuest.sys",
+        "C:\\Windows\\System32\\drivers\\VBoxSF.sys",
+        "C:\\Windows\\System32\\drivers\\VBoxVideo.sys"
+    };
+
+    for (int i = 0; i < sizeof(virtualBoxFiles) / sizeof(virtualBoxFiles[0]); i++) {
+        check_file(virtualBoxFiles[i]);
+    }
+
 }
 
 
@@ -147,16 +225,17 @@ int main() {
     srand(time(NULL));
 
     /* Выявление виртаульной машины */
-    detect_virtual_machine();
+    check_vmware_keys();
+    check_vbox_keys();
+    check_vmware_files();
+    check_vbox_files();
 
     /* Выявление отладчиков */
     if (IsDebuggerPresent())
         return 0;
 
     remote_debugger();
-
     detect_ollydbg_or_windbg();
-
     check_ticks();
     
     /* Проверка CRC */
